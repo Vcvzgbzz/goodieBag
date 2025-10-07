@@ -11,8 +11,8 @@ app.use('/api', lootboxRoutes);
 const PORT = process.env.PORT || 3000;
 
 const options = {
-  key: fs.readFileSync('./treggat.us.key'),
-  cert: fs.readFileSync('./treggat.us.cer'),
+//   key: fs.readFileSync('./treggat.us.key'),
+//   cert: fs.readFileSync('./treggat.us.cer'),
 };
 
 https.createServer(options, app).listen(PORT, () => {
