@@ -20,13 +20,17 @@ function pickRandomItem() {
 }
 
 router.get('/lootbox', async (req, res) => {
+    
     const { username, userId } = req.query;
+    console.log("Got a requst for",userId)
 
     if (!username || !userId) {
         return res.status(400).json({ error: 'Missing user info' });
     }
 
     const reward = pickRandomItem();
+
+    console.log('Reward chosen: ', reward)
 
     const conn = await pool.getConnection();
     try {
