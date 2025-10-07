@@ -19,8 +19,8 @@ function pickRandomItem() {
     }
 }
 
-router.post('/lootbox', async (req, res) => {
-    const { username, userId } = req.body;
+router.get('/lootbox', async (req, res) => {
+    const { username, userId } = req.query;
 
     if (!username || !userId) {
         return res.status(400).json({ error: 'Missing user info' });
