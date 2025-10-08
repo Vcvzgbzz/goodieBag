@@ -1,11 +1,22 @@
-const { itemEmojiByRarity } = require('../appConstants');
+
 
 const express = require('express');
 const router = express.Router();
 const pool = require('../db/connection');
 
 
+
 const Admins = ['Vechkabaz', 'TreggatTV'];
+
+const itemEmojiByRarity = {
+    Common: "⚪",
+    Uncommon: "🟢",
+    Rare: "🔵",
+    Epic: "🟣",
+    Legendary: "🟡",
+    Mythic: "🔴"
+  };
+  
 
 const rarities = [
   { rarity: "Common", weight: 60 },
