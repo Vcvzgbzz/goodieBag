@@ -267,104 +267,111 @@ router.get('/inventory', async (req, res) => {
 });
 
 router.get('/sell', async (req, res) => {
-    const { username, userId, textMode, query } = req.query;
-    const channelId = req.headers['x-streamelements-channel'];
-  
-    console.log('Got a request to sell items:', {
-      queryParams: req.query,
-      channel: channelId,
-      sellData: query
-    });
-  
-    if (!username || !userId)
-      return res.status(400).json({ error: 'Missing user info' });
-    if (!channelId)
-      return res.status(400).json({ error: 'Missing StreamElements channel header' });
-  
-    const usersTable = `lootbox_users_${channelId}`;
-    const rewardsTable = `lootbox_rewards_${channelId}`;
-    const conn = await pool.getConnection();
-  
-    try {
-      // Ensure tables exist
-      await conn.query(userTableTemplate(usersTable));
-      await conn.query(rewardsTableTemplate(rewardsTable));
-  
-      // Parse sell query
-      const sellText = (query || '').trim();
-  
+  const { username, userId, textMode, quantity, rarity, itemName } = req.query;
+  const channelId = req.headers['x-streamelements-channel'];
+
+  console.log('Got a request to sell items:', {
+    queryParams: req.query,
+    channel: channelId
+  });
+
+  if (!username || !userId)
+    return res.status(400).json({ error: 'Missing user info' });
+  if (!channelId)
+    return res.status(400).json({ error: 'Missing StreamElements channel header' });
+
+  const usersTable = `lootbox_users_${channelId}`;
+  const rewardsTable = `lootbox_rewards_${channelId}`;
+  const conn = await pool.getConnection();
+
+  try {
+    await conn.query(userTableTemplate(usersTable));
+    await conn.query(rewardsTableTemplate(rewardsTable));
+
+    let whereClause = '';
+    let params = [userId];
+    let sellAll = false;
+    let itemsToSell = [];
+
+    // === Explicit Param Handling ===
+    if (quantity && rarity && itemName) {
+      const itemCondition = req.query.condition || 'Field-Tested'; // default condition
+      whereClause = `AND reward_rarity = ? AND reward_condition = ? AND reward_name = ? LIMIT ${parseInt(quantity)}`;
+      params.push(
+        rarity.charAt(0).toUpperCase() + rarity.slice(1).toLowerCase(),
+        itemCondition,
+        itemName
+      );
+    }
+    // === Fallback to Query Parsing ===
+    else {
+      const sellText = (req.query.query || '').trim();
       if (!sellText)
         return res.json({ message: '❔ Please specify what to sell. Example: !sell all Common or !sell 1 Minimal Wear Glorpshake' });
-  
-      let whereClause = '';
-      let params = [userId];
-      let sellAll = false;
-  
-      // === Handle "sell all" cases ===
+
       const parts = sellText.split(' ');
       if (parts[0].toLowerCase() === 'all') {
         sellAll = true;
         if (parts[1]) {
-          const rarity = parts[1].charAt(0).toUpperCase() + parts[1].slice(1).toLowerCase();
+          const r = parts[1].charAt(0).toUpperCase() + parts[1].slice(1).toLowerCase();
           whereClause = `AND reward_rarity = ?`;
-          params.push(rarity);
+          params.push(r);
         }
       } else if (!isNaN(parts[0])) {
         const amount = parseInt(parts[0]);
         const condition = parts[1] + ' ' + parts[2];
-        const itemName = parts.slice(3).join(' ');
+        const name = parts.slice(3).join(' ');
         whereClause = `AND reward_condition = ? AND reward_name = ? LIMIT ${amount}`;
-        params.push(condition, itemName);
+        params.push(condition, name);
       } else {
         return res.json({ message: '❔ Invalid sell syntax. Use !sell all <rarity> or !sell <amount> <condition> <item>' });
       }
-  
-      // === Select items to sell ===
-      const [items] = await conn.query(
-        `SELECT id, reward_value, reward_name, reward_rarity, reward_condition
-         FROM \`${rewardsTable}\`
-         WHERE user_id = ? ${whereClause}`,
-        params
-      );
-  
-      if (items.length === 0)
-        return res.json({ message: `🪙 No matching items found to sell.` });
-  
-      const totalValue = items.reduce((sum, item) => sum + Number(item.reward_value), 0);
-  
-      // === Delete sold items ===
-      const ids = items.map(i => i.id);
-      if (ids.length > 0) {
-        await conn.query(
-          `DELETE FROM \`${rewardsTable}\` WHERE id IN (${ids.map(() => '?').join(',')})`,
-          ids
-        );
-      }
-  
-      // === Update player balance ===
-      await conn.query(
-        `INSERT INTO \`${usersTable}\` (user_id, username, total_opened, balance)
-         VALUES (?, ?, 0, ?)
-         ON DUPLICATE KEY UPDATE balance = balance + VALUES(balance)`,
-        [userId, username, totalValue]
-      );
-  
-      const sellType = sellAll
-        ? (parts[1] ? `${parts[1]} rarity` : 'everything')
-        : `${items[0].reward_name} (${items[0].reward_condition})`;
-  
-      const message = `💰 ${username} sold ${items.length} item(s) (${sellType}) for a total of 💵 ${totalValue}!`;
-  
-      if (textMode === 'true') res.send(message);
-      else res.json({ sold: items, totalValue, message });
-  
-    } catch (err) {
-      console.error('❌ Error processing sell:', err);
-      res.status(500).json({ error: 'Failed to process sale' });
-    } finally {
-      conn.release();
     }
-  });  
+
+    // === Select matching items ===
+    const [items] = await conn.query(
+      `SELECT id, reward_value, reward_name, reward_rarity, reward_condition
+       FROM \`${rewardsTable}\`
+       WHERE user_id = ? ${whereClause}`,
+      params
+    );
+
+    if (!items || items.length === 0)
+      return res.json({ message: `🪙 No matching items found to sell.` });
+
+    const totalValue = items.reduce((sum, item) => sum + Number(item.reward_value), 0);
+
+    const ids = items.map(i => i.id);
+    if (ids.length > 0) {
+      await conn.query(
+        `DELETE FROM \`${rewardsTable}\` WHERE id IN (${ids.map(() => '?').join(',')})`,
+        ids
+      );
+    }
+
+    await conn.query(
+      `INSERT INTO \`${usersTable}\` (user_id, username, total_opened, balance)
+       VALUES (?, ?, 0, ?)
+       ON DUPLICATE KEY UPDATE balance = balance + VALUES(balance)`,
+      [userId, username, totalValue]
+    );
+
+    const sellType = sellAll
+      ? (rarity ? `${rarity} rarity` : 'everything')
+      : `${items[0].reward_name} (${items[0].reward_condition})`;
+
+    const message = `💰 ${username} sold ${items.length} item(s) (${sellType}) for a total of 💵 ${totalValue}!`;
+
+    if (textMode === 'true') res.send(message);
+    else res.json({ sold: items, totalValue, message });
+
+  } catch (err) {
+    console.error('❌ Error processing sell:', err);
+    res.status(500).json({ error: 'Failed to process sale' });
+  } finally {
+    conn.release();
+  }
+});
 
   router.get('/balance', async (req, res) => {
     const { username, userId, textMode } = req.query;
