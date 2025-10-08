@@ -163,21 +163,12 @@ router.get('/lootbox', async (req, res) => {
 
     await conn.commit();
 
-   // === Assign random condition and calculate value ===
-    const conditions = Object.keys(conditionModifiers);
-    const condition = conditions[Math.floor(Math.random() * conditions.length)];
-    const conditionEmoji = conditionEmojis[condition];
-    const baseValue = rarityBasePrice[reward.rarity] || 0;
-    const modifier = conditionModifiers[condition];
-    const finalValue = Math.round(baseValue * modifier);
-
-    // Add these properties to reward object for DB & response
-    reward.condition = condition;
-    reward.value = finalValue;
-
-    // === Message ===
     const rarityEmoji = itemEmojiByRarity?.[reward.rarity] ?? '⚫';
-    const message = `${rarityEmoji} 🎁 ${username} opened a lootbox and received a ${reward.rarity.toUpperCase()} item: "${reward.name}" ${conditionEmoji} (${condition}) worth 💰${finalValue}! ${rarityEmoji}`;
+    const condition = reward.condition;
+    const conditionEmoji = conditionEmojis[condition] || '❔';
+    const value = reward.value ?? 0;
+
+    const message = `${rarityEmoji} 🎁 ${username} opened a lootbox and received a ${reward.rarity.toUpperCase()} item: "${reward.name}" ${conditionEmoji} (${condition}) worth 💰${value}! ${rarityEmoji}`;
 
     
 
