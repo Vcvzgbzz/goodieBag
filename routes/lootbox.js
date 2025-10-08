@@ -54,7 +54,7 @@ const conditionEmojis = {
     "Field-Tested": "⚙️",       
     "Minimal Wear": "✨",       
     "Factory-New": "💎"    
-  };
+  }; 
   
 
 function pickWeighted(array) {
@@ -163,11 +163,22 @@ router.get('/lootbox', async (req, res) => {
 
     await conn.commit();
 
+   // === Assign random condition and calculate value ===
+    const conditions = Object.keys(conditionModifiers);
+    const condition = conditions[Math.floor(Math.random() * conditions.length)];
+    const conditionEmoji = conditionEmojis[condition];
+    const baseValue = rarityBasePrice[reward.rarity] || 0;
+    const modifier = conditionModifiers[condition];
+    const finalValue = Math.round(baseValue * modifier);
+
+    // Add these properties to reward object for DB & response
+    reward.condition = condition;
+    reward.value = finalValue;
+
+    // === Message ===
     const rarityEmoji = itemEmojiByRarity?.[reward.rarity] ?? '⚫';
-    const condition = reward.condition;
-    const conditionEmoji = conditionEmojis[condition] || '❔';
-    
-    const message = `${rarityEmoji} 🎁 ${username} opened a lootbox and received a ${reward.rarity.toUpperCase()} item: "${reward.name}" ${conditionEmoji} (${condition})! ${rarityEmoji}`;
+    const message = `${rarityEmoji} 🎁 ${username} opened a lootbox and received a ${reward.rarity.toUpperCase()} item: "${reward.name}" ${conditionEmoji} (${condition}) worth 💰${finalValue}! ${rarityEmoji}`;
+
     
 
     if (textMode === 'true'){
@@ -236,21 +247,24 @@ router.get('/inventory', async (req, res) => {
     let totalWealth = 0;
 
     for (const { reward_name, reward_rarity, reward_condition, count, total_value } of rows) {
+      const numericValue = Number(total_value) || 0; // convert string → number safely
+    
       if (!inventory[reward_rarity]) inventory[reward_rarity] = [];
       inventory[reward_rarity].push(
-        `${reward_name} (${reward_condition}) x${count} — 💰${total_value}`
+        `${reward_name} (${reward_condition}) x${count} — 💰${numericValue}`
       );
-      totalWealth += total_value;
+    
+      totalWealth += numericValue;
     }
-
+    
     const rarityOrder = ["Mythic", "Legendary", "Epic", "Rare", "Uncommon", "Common"];
     const display = rarityOrder
       .filter(r => inventory[r])
       .map(r => `${itemEmojiByRarity[r]} ${r.toUpperCase()}: ${inventory[r].join(', ')}`)
       .join(' | ');
-
+    
     const message = `🎒 ${username}'s Inventory → ${display} | 🏦 Total Value: 💰${totalWealth}`;
-
+    
     if (textMode === 'true') res.send(message);
     else res.json({ inventory, totalWealth, message });
 
