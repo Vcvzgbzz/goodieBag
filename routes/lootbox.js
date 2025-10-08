@@ -1,4 +1,4 @@
-import { itemEmojiByRarity } from '../appConstants';
+const { itemEmojiByRarity } = require('../appConstants');
 
 const express = require('express');
 const router = express.Router();
