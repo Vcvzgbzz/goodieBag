@@ -48,6 +48,15 @@ const conditions = [
   { condition: "Factory-New", weight: 5, multiplier: 1.5 }
 ];
 
+const conditionEmojis = {
+    "Battle-Scarred": "💀",     
+    "Well-Worn": "🥲",         
+    "Field-Tested": "⚙️",       
+    "Minimal Wear": "✨",       
+    "Factory-New": "💎"    
+  };
+  
+
 function pickWeighted(array) {
   const total = array.reduce((sum, a) => sum + a.weight, 0);
   let rand = Math.random() * total;
@@ -155,7 +164,11 @@ router.get('/lootbox', async (req, res) => {
     await conn.commit();
 
     const rarityEmoji = itemEmojiByRarity?.[reward.rarity] ?? '⚫';
-    const message = `${rarityEmoji} 🎁 ${username} unboxed a ${reward.condition} ${reward.rarity.toUpperCase()} "${reward.name}" worth 💰 ${reward.value}! ${rarityEmoji}`;
+    const condition = reward.condition;
+    const conditionEmoji = conditionEmojis[condition] || '❔';
+    
+    const message = `${rarityEmoji} 🎁 ${username} opened a lootbox and received a ${reward.rarity.toUpperCase()} item: "${reward.name}" ${conditionEmoji} (${condition})! ${rarityEmoji}`;
+    
 
     if (textMode === 'true'){
         res.send(message);
@@ -197,15 +210,21 @@ router.get('/inventory', async (req, res) => {
     `);
 
     const [rows] = await conn.query(
-      `SELECT reward_name, reward_rarity, reward_condition, COUNT(*) as count, SUM(reward_value) as total_value
-       FROM \`${rewardsTable}\`
-       WHERE user_id = ?
-       GROUP BY reward_name, reward_rarity, reward_condition
-       ORDER BY 
-         FIELD(reward_rarity, 'Mythic', 'Legendary', 'Epic', 'Rare', 'Uncommon', 'Common'),
-         reward_value DESC`,
-      [userId]
-    );
+        `SELECT 
+            reward_name, 
+            reward_rarity, 
+            reward_condition, 
+            COUNT(*) as count, 
+            SUM(reward_value) as total_value
+         FROM \`${rewardsTable}\`
+         WHERE user_id = ?
+         GROUP BY reward_name, reward_rarity, reward_condition
+         ORDER BY 
+           FIELD(reward_rarity, 'Mythic', 'Legendary', 'Epic', 'Rare', 'Uncommon', 'Common'),
+           total_value DESC`,
+        [userId]
+      );
+      
 
     if (rows.length === 0) {
       const emptyMsg = `${username} has no loot yet. 🕳️`;
