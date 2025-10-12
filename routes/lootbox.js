@@ -120,6 +120,9 @@ router.get('/lootbox', async (req, res) => {
   const { username, userId, textMode } = req.query;
   const channelId = req.headers['x-streamelements-channel'];
 
+
+  console.log('Receiving call to open a lootbox: ',{...req.query,channelId:channelId})
+
   const now = Date.now();
   const lastCall = cooldowns[userId] || 0;
   const cooldownTime = 360 * 1000; // 360 seconds
@@ -201,6 +204,9 @@ router.get('/inventory', async (req, res) => {
   const { username, userId, textMode } = req.query;
   const channelId = req.headers['x-streamelements-channel'];
 
+
+    console.log('Receiving call to check the inventory: ',{...req.query,channelId:channelId})
+
   if (!username || !userId) return res.status(400).json({ error: 'Missing user info' });
   if (!channelId) return res.status(400).json({ error: 'Missing StreamElements channel header' });
 
@@ -267,10 +273,21 @@ router.get('/inventory', async (req, res) => {
 });
 
 router.get('/sell', async (req, res) => {
-  const { username, userId, textMode, quantity, conditionOrRarity, itemName } = req.query;
   const channelId = req.headers['x-streamelements-channel'];
 
-  console.log('Got a request to sell',{...req.query})
+    console.log('Receiving call to sell: ',{...req.query,channelId:channelId})
+
+
+  function stripQuotes(str) {
+    return typeof str === 'string' ? str.replace(/^"(.*)"$/, '$1') : str;
+  }
+
+  const username = stripQuotes(req.query.username);
+  const userId = stripQuotes(req.query.userId);
+  const textMode = stripQuotes(req.query.textMode);
+  const quantity = stripQuotes(req.query.quantity);
+  const conditionOrRarity = stripQuotes(req.query.conditionOrRarity);
+  const itemName = stripQuotes(req.query.itemName);
 
   if (!username || !userId)
     return res.status(400).json({ error: 'Missing user info' });
