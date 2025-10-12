@@ -2,9 +2,11 @@ require('dotenv').config();
 const express = require('express');
 const app = express();
 const lootboxRoutes = require('./routes/lootbox');
+const slotRoutes = require('./routes/slots');
 
 app.use(express.json());
 app.use('/api', lootboxRoutes);
+app.use('/api', slotRoutes);
 
 const PORT = process.env.PORT || 3000;
 
