@@ -112,11 +112,8 @@ const sellAllByRarity = async (rarity, userId, channelId, conn) => {
 
 // === LOOTBOX ROUTE ===
 router.get('/lootbox', async (req, res) => {
-  const { username, userId, textMode } = req.query;
-  const channelId = req.headers['x-streamelements-channel'];
+  const { username, userId, textMode, channelId } = req.query;
 
-
-  
 
   const now = Date.now();
   const lastCall = cooldowns[userId] || 0;
@@ -126,7 +123,7 @@ router.get('/lootbox', async (req, res) => {
     return res.status(400).json({ error: 'Missing user info' });
   }
   if (!channelId && !Admins.includes(userId)) {
-    return res.status(400).json({ error: 'Missing StreamElements channel header' });
+    return res.status(400).json({ error: 'Missing channel ID' });
   }
 
   if (!Admins.includes(username) && (now - lastCall < cooldownTime)) {
@@ -202,14 +199,13 @@ router.get('/lootbox', async (req, res) => {
 
 // === INVENTORY ROUTE ===
 router.get('/inventory', async (req, res) => {
-  const { username, userId, textMode } = req.query;
-  const channelId = req.headers['x-streamelements-channel'];
+  const { username, userId, textMode, channelId } = req.query;
 
 
     console.log('Receiving call to check the inventory: ',{...req.query,channelId:channelId})
 
   if (!username || !userId) return res.status(400).json({ error: 'Missing user info' });
-  if (!channelId) return res.status(400).json({ error: 'Missing StreamElements channel header' });
+  if (!channelId) return res.status(400).json({ error: 'Missing channel ID' });
 
   const rewardsTable = `lootbox_rewards_${channelId}`;
   const conn = await pool.getConnection();
@@ -273,117 +269,8 @@ router.get('/inventory', async (req, res) => {
   }
 });
 
-router.get('/sell', async (req, res) => {
-  const channelId = req.headers['x-streamelements-channel'];
-
-    console.log('Receiving call to sell: ',{...req.query,channelId:channelId})
-
-
-  function stripQuotes(str) {
-    return typeof str === 'string' ? str.replace(/^"(.*)"$/, '$1') : str;
-  }
-
-  const username = stripQuotes(req.query.username);
-  const userId = stripQuotes(req.query.userId);
-  const textMode = stripQuotes(req.query.textMode);
-  const quantity = stripQuotes(req.query.quantity);
-  const conditionOrRarity = stripQuotes(req.query.conditionOrRarity);
-  const itemName = stripQuotes(req.query.itemName);
-
-  if (!username || !userId)
-    return res.status(400).json({ error: 'Missing user info' });
-  if (!channelId)
-    return res.status(400).json({ error: 'Missing StreamElements channel header' });
-
-  if (!quantity) return res.status(400).json({ error: 'Quantity must be specified' });
-
-  const usersTable = `lootbox_users_${channelId}`;
-  const rewardsTable = `lootbox_rewards_${channelId}`;
-  const conn = await pool.getConnection();
-
-  try {
-    await conn.query(userTableTemplate(usersTable));
-    await conn.query(rewardsTableTemplate(rewardsTable));
-
-    await conn.beginTransaction();
-
-    let query = '';
-    let queryParams = [userId];
-    let itemsSold = [];
-    let totalValue = 0;
-
-    const lowerRarity = conditionOrRarity?.toLowerCase();
-    const validRarities = Object.keys(itemEmojiByRarity).map(r => r.toLowerCase());
-    const validConditions = Object.keys(conditionEmojis).map(c => c.toLowerCase());
-
-    if (quantity === 'all' && !conditionOrRarity && !itemName) {
-      query = `
-        SELECT id, reward_value FROM \`${rewardsTable}\`
-        WHERE user_id = ?`;
-    }
-
-    else if (quantity === 'all' && conditionOrRarity && validRarities.includes(lowerRarity)) {
-      query = `
-        SELECT id, reward_value FROM \`${rewardsTable}\`
-        WHERE user_id = ? AND LOWER(reward_rarity) = ?`;
-      queryParams.push(lowerRarity);
-    }
-
-    else if (quantity && conditionOrRarity && itemName) {
-      if (!validConditions.includes(conditionOrRarity.toLowerCase())) {
-        return res.status(400).json({ error: 'Invalid item condition' });
-      }
-
-      query = `
-        SELECT id, reward_value FROM \`${rewardsTable}\`
-        WHERE user_id = ? AND reward_name = ? AND LOWER(reward_condition) = ?
-        LIMIT ?`;
-      queryParams.push(itemName, conditionOrRarity.toLowerCase(), parseInt(quantity));
-    }
-
-    else {
-      return res.status(400).json({ error: 'Invalid sell parameters' });
-    }
-
-    const [rows] = await conn.query(query, queryParams);
-
-    if (!rows.length) {
-      const emptyMsg = `🫥 ${username} has no items matching that criteria.`;
-      if (textMode === 'true') return res.send(emptyMsg);
-      return res.status(404).json({ error: emptyMsg });
-    }
-
-    const idsToDelete = rows.map(row => row.id);
-    totalValue = rows.reduce((sum, row) => sum + row.reward_value, 0);
-
-    if (idsToDelete.length) {
-      const deleteQuery = `DELETE FROM \`${rewardsTable}\` WHERE id IN (${idsToDelete.map(() => '?').join(',')})`;
-      await conn.query(deleteQuery, idsToDelete);
-
-      await conn.query(
-        `UPDATE \`${usersTable}\` SET balance = balance + ? WHERE user_id = ?`,
-        [totalValue, userId]
-      );
-    }
-
-    await conn.commit();
-
-    const message = `✅ ${username} sold ${idsToDelete.length} item(s) for 💰${totalValue}.`;
-
-    if (textMode === 'true') return res.send(message);
-    else return res.json({ sold: idsToDelete.length, value: totalValue, message });
-
-  } catch (err) {
-    await conn.rollback();
-    console.error('❌ Error processing sell:', err);
-    res.status(500).json({ error: 'Failed to process sell' });
-  } finally {
-    conn.release();
-  }
-});
-
 router.get('/sellAll', async (req, res) => {
-  const channelId = req.headers['x-streamelements-channel'];
+  const {  channelId } = req.query;
   console.log('Receiving call to sellAll:', { ...req.query, channelId });
 
   function stripQuotes(str) {
@@ -398,7 +285,7 @@ router.get('/sellAll', async (req, res) => {
     return res.status(400).json({ error: 'Missing user info' });
 
   if (!channelId)
-    return res.status(400).json({ error: 'Missing StreamElements channel header' });
+    return res.status(400).json({ error: 'Missing channel ID' });
 
   const usersTable = `lootbox_users_${channelId}`;
   const rewardsTable = `lootbox_rewards_${channelId}`;
@@ -451,7 +338,7 @@ router.get('/sellAll', async (req, res) => {
 
 for (const rarity of rarityEndpoints) {
   router.get(`/sellAll${rarity}`, async (req, res) => {
-    const channelId = req.headers['x-streamelements-channel'];
+    const channelId = req.query.channelId;
     console.log(`Receiving call to sellAll${rarity}:`, { ...req.query, channelId });
 
     function stripQuotes(str) {
@@ -465,7 +352,7 @@ for (const rarity of rarityEndpoints) {
     if (!username || !userId)
       return res.status(400).json({ error: 'Missing user info' });
     if (!channelId)
-      return res.status(400).json({ error: 'Missing StreamElements channel header' });
+      return res.status(400).json({ error: 'Missing channel ID' });
 
     const conn = await pool.getConnection();
 

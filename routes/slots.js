@@ -17,7 +17,7 @@ const {
 
 
 router.get('/slots', async (req, res) => {
-  const channelId = req.headers['x-streamelements-channel'];
+  const channelId = req.query.channelId
   console.log('Receiving call to /slots:', { ...req.query, channelId });
 
   function stripQuotes(str) {
@@ -34,7 +34,7 @@ router.get('/slots', async (req, res) => {
   if (!username || !userId)
     return res.status(400).json({ error: 'Missing user info' });
   if (!channelId)
-    return res.status(400).json({ error: 'Missing StreamElements channel header' });
+    return res.status(400).json({ error: 'Missing channel ID' });
   if (!betAmount || betAmount <= 0)
     return res.status(400).json({ error: 'Invalid or missing bet amount' });
 
@@ -95,7 +95,7 @@ router.get('/slots', async (req, res) => {
         outcome = 'Smh, we just got egged :(';
         multiplier = 0.8;
     } else {
-        multiplier = 1.5;
+        multiplier = 2;
         outcome = 'Nice! You got a pair.';
     }
     } else {
