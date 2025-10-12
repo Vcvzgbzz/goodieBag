@@ -270,6 +270,8 @@ router.get('/sell', async (req, res) => {
   const { username, userId, textMode, quantity, conditionOrRarity, itemName } = req.query;
   const channelId = req.headers['x-streamelements-channel'];
 
+  console.log('Got a request to sell',{...req.query})
+
   if (!username || !userId)
     return res.status(400).json({ error: 'Missing user info' });
   if (!channelId)
