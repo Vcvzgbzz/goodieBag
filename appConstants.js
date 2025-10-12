@@ -1,4 +1,4 @@
-const Admins = ['Vechkabaz', 'TreggatTV'];
+const Admins = ['Vechkabaz', 'TreggatTV', 'turtlerexxx', 'slumpymr'];
 
 const itemEmojiByRarity = {
   Common: "⚪",
