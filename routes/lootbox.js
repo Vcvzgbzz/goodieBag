@@ -116,7 +116,7 @@ router.get('/lootbox', async (req, res) => {
   const channelId = req.headers['x-streamelements-channel'];
 
 
-  console.log('Receiving call to open a lootbox: ',{...req.query,channelId:channelId})
+  
 
   const now = Date.now();
   const lastCall = cooldowns[userId] || 0;
@@ -136,8 +136,13 @@ router.get('/lootbox', async (req, res) => {
     return res.status(429).json({ error: cooldownMsg });
   }
 
+  if(Admins.includes(username) && (now - lastCall < cooldownTime)){
+    console.log(`Admin ${username} Overriding cooldown on lootbox `)
+  }
   cooldowns[userId] = now;
   const reward = pickRandomItem();
+
+  console.log('Receiving call to open a lootbox: ',{...req.query,channelId:channelId,reward:reward})
   const conn = await pool.getConnection();
 
   try {

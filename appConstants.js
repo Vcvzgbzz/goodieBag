@@ -14,8 +14,8 @@ const rarities = [
   { rarity: "Uncommon", weight: 35 },
   { rarity: "Rare", weight: 20 },
   { rarity: "Epic", weight: 10 },
-  { rarity: "Legendary", weight: 1.5 },
-  { rarity: "Mythic", weight: 0.25 }
+  { rarity: "Legendary", weight: 1.25 },
+  { rarity: "Mythic", weight: 0.20 }
 ];
 
 const rarityBasePrice = {
