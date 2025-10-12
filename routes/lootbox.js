@@ -14,12 +14,12 @@ const itemEmojiByRarity = {
 };
 
 const rarities = [
-  { rarity: "Common", weight: 60 },
-  { rarity: "Uncommon", weight: 40 },
+  { rarity: "Common", weight: 55 },
+  { rarity: "Uncommon", weight: 35 },
   { rarity: "Rare", weight: 20 },
-  { rarity: "Epic", weight: 9 },
-  { rarity: "Legendary", weight: 1 },
-  { rarity: "Mythic", weight: 0.1 }
+  { rarity: "Epic", weight: 10 },
+  { rarity: "Legendary", weight: 1.5 },
+  { rarity: "Mythic", weight: 0.25 }
 ];
 
 const rarityBasePrice = {
@@ -267,18 +267,15 @@ router.get('/inventory', async (req, res) => {
 });
 
 router.get('/sell', async (req, res) => {
-  const { username, userId, textMode, quantity, rarity, itemName } = req.query;
+  const { username, userId, textMode, quantity, conditionOrRarity, itemName } = req.query;
   const channelId = req.headers['x-streamelements-channel'];
-
-  console.log('Got a request to sell items:', {
-    queryParams: req.query,
-    channel: channelId
-  });
 
   if (!username || !userId)
     return res.status(400).json({ error: 'Missing user info' });
   if (!channelId)
     return res.status(400).json({ error: 'Missing StreamElements channel header' });
+
+  if (!quantity) return res.status(400).json({ error: 'Quantity must be specified' });
 
   const usersTable = `lootbox_users_${channelId}`;
   const rewardsTable = `lootbox_rewards_${channelId}`;
@@ -288,134 +285,83 @@ router.get('/sell', async (req, res) => {
     await conn.query(userTableTemplate(usersTable));
     await conn.query(rewardsTableTemplate(rewardsTable));
 
-    let whereClause = '';
-    let params = [userId];
-    let sellAll = false;
-    let itemsToSell = [];
+    await conn.beginTransaction();
 
-    // === Explicit Param Handling ===
-    if (quantity && rarity && itemName) {
-      const itemCondition = req.query.condition || 'Field-Tested'; // default condition
-      whereClause = `AND reward_rarity = ? AND reward_condition = ? AND reward_name = ? LIMIT ${parseInt(quantity)}`;
-      params.push(
-        rarity.charAt(0).toUpperCase() + rarity.slice(1).toLowerCase(),
-        itemCondition,
-        itemName
-      );
+    let query = '';
+    let queryParams = [userId];
+    let itemsSold = [];
+    let totalValue = 0;
+
+    const lowerRarity = conditionOrRarity?.toLowerCase();
+    const validRarities = Object.keys(itemEmojiByRarity).map(r => r.toLowerCase());
+    const validConditions = Object.keys(conditionEmojis).map(c => c.toLowerCase());
+
+    if (quantity === 'all' && !conditionOrRarity && !itemName) {
+      query = `
+        SELECT id, reward_value FROM \`${rewardsTable}\`
+        WHERE user_id = ?`;
     }
-    // === Fallback to Query Parsing ===
-    else {
-      const sellText = (req.query.query || '').trim();
-      if (!sellText)
-        return res.json({ message: '❔ Please specify what to sell. Example: !sell all Common or !sell 1 Minimal Wear Glorpshake' });
 
-      const parts = sellText.split(' ');
-      if (parts[0].toLowerCase() === 'all') {
-        sellAll = true;
-        if (parts[1]) {
-          const r = parts[1].charAt(0).toUpperCase() + parts[1].slice(1).toLowerCase();
-          whereClause = `AND reward_rarity = ?`;
-          params.push(r);
-        }
-      } else if (!isNaN(parts[0])) {
-        const amount = parseInt(parts[0]);
-        const condition = parts[1] + ' ' + parts[2];
-        const name = parts.slice(3).join(' ');
-        whereClause = `AND reward_condition = ? AND reward_name = ? LIMIT ${amount}`;
-        params.push(condition, name);
-      } else {
-        return res.json({ message: '❔ Invalid sell syntax. Use !sell all <rarity> or !sell <amount> <condition> <item>' });
+    else if (quantity === 'all' && conditionOrRarity && validRarities.includes(lowerRarity)) {
+      query = `
+        SELECT id, reward_value FROM \`${rewardsTable}\`
+        WHERE user_id = ? AND LOWER(reward_rarity) = ?`;
+      queryParams.push(lowerRarity);
+    }
+
+    else if (quantity && conditionOrRarity && itemName) {
+      if (!validConditions.includes(conditionOrRarity.toLowerCase())) {
+        return res.status(400).json({ error: 'Invalid item condition' });
       }
+
+      query = `
+        SELECT id, reward_value FROM \`${rewardsTable}\`
+        WHERE user_id = ? AND reward_name = ? AND LOWER(reward_condition) = ?
+        LIMIT ?`;
+      queryParams.push(itemName, conditionOrRarity.toLowerCase(), parseInt(quantity));
     }
 
-    // === Select matching items ===
-    const [items] = await conn.query(
-      `SELECT id, reward_value, reward_name, reward_rarity, reward_condition
-       FROM \`${rewardsTable}\`
-       WHERE user_id = ? ${whereClause}`,
-      params
-    );
+    else {
+      return res.status(400).json({ error: 'Invalid sell parameters' });
+    }
 
-    if (!items || items.length === 0)
-      return res.json({ message: `🪙 No matching items found to sell.` });
+    const [rows] = await conn.query(query, queryParams);
 
-    const totalValue = items.reduce((sum, item) => sum + Number(item.reward_value), 0);
+    if (!rows.length) {
+      const emptyMsg = `🫥 ${username} has no items matching that criteria.`;
+      if (textMode === 'true') return res.send(emptyMsg);
+      return res.status(404).json({ error: emptyMsg });
+    }
 
-    const ids = items.map(i => i.id);
-    if (ids.length > 0) {
+    const idsToDelete = rows.map(row => row.id);
+    totalValue = rows.reduce((sum, row) => sum + row.reward_value, 0);
+
+    if (idsToDelete.length) {
+      const deleteQuery = `DELETE FROM \`${rewardsTable}\` WHERE id IN (${idsToDelete.map(() => '?').join(',')})`;
+      await conn.query(deleteQuery, idsToDelete);
+
       await conn.query(
-        `DELETE FROM \`${rewardsTable}\` WHERE id IN (${ids.map(() => '?').join(',')})`,
-        ids
+        `UPDATE \`${usersTable}\` SET balance = balance + ? WHERE user_id = ?`,
+        [totalValue, userId]
       );
     }
 
-    await conn.query(
-      `INSERT INTO \`${usersTable}\` (user_id, username, total_opened, balance)
-       VALUES (?, ?, 0, ?)
-       ON DUPLICATE KEY UPDATE balance = balance + VALUES(balance)`,
-      [userId, username, totalValue]
-    );
+    await conn.commit();
 
-    const sellType = sellAll
-      ? (rarity ? `${rarity} rarity` : 'everything')
-      : `${items[0].reward_name} (${items[0].reward_condition})`;
+    const message = `✅ ${username} sold ${idsToDelete.length} item(s) for 💰${totalValue}.`;
 
-    const message = `💰 ${username} sold ${items.length} item(s) (${sellType}) for a total of 💵 ${totalValue}!`;
-
-    if (textMode === 'true') res.send(message);
-    else res.json({ sold: items, totalValue, message });
+    if (textMode === 'true') return res.send(message);
+    else return res.json({ sold: idsToDelete.length, value: totalValue, message });
 
   } catch (err) {
+    await conn.rollback();
     console.error('❌ Error processing sell:', err);
-    res.status(500).json({ error: 'Failed to process sale' });
+    res.status(500).json({ error: 'Failed to process sell' });
   } finally {
     conn.release();
   }
 });
 
-  router.get('/balance', async (req, res) => {
-    const { username, userId, textMode } = req.query;
-    const channelId = req.headers['x-streamelements-channel'];
-  
-    console.log('Got a request to check balance:', {
-      queryParams: req.query,
-      channel: channelId,
-      ip: req.headers['x-forwarded-for']
-    });
-  
-    if (!username || !userId)
-      return res.status(400).json({ error: 'Missing user info' });
-    if (!channelId)
-      return res.status(400).json({ error: 'Missing StreamElements channel header' });
-  
-    const usersTable = `lootbox_users_${channelId}`;
-    const conn = await pool.getConnection();
-  
-    try {
-      await conn.query(userTableTemplate(usersTable));
-      
-      const [rows] = await conn.query(
-        `SELECT balance FROM \`${usersTable}\` WHERE user_id = ?`,
-        [userId]
-      );
-  
-      let balance = 0;
-      if (rows.length > 0 && rows[0].balance !== null) {
-        balance = Number(rows[0].balance);
-      }
-  
-      const message = `💰 ${username}'s current balance: 💵 ${balance}`;
-  
-      if (textMode === 'true') res.send(message);
-      else res.json({ username, balance, message });
-  
-    } catch (err) {
-      console.error('❌ Error fetching balance:', err);
-      res.status(500).json({ error: 'Failed to fetch balance' });
-    } finally {
-      conn.release();
-    }
-  });
   
   
 module.exports = router;
