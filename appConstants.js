@@ -1,4 +1,8 @@
-const Admins = ['Vechkabaz', 'TreggatTV', 'turtlerexxx', 'slumpymr'];
+const Admins = ['805897628', '102369946', '837397032'];
+
+// 102369946 treggat
+// 805897628 jadeyn
+// 837397032 hunter
 
 const itemEmojiByRarity = {
   Common: "⚪",
