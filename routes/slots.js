@@ -29,7 +29,7 @@ router.get('/slots', async (req, res) => {
   const textMode = stripQuotes(req.query.textMode);
   const betAmount = parseInt(stripQuotes(req.query.balance), 10);
 
-  const emojiSet = ['🍒', '🍋', '🍇', '🍉', '💎', '🍆','🫐'];
+  const emojiSet = ['🍒', '🍋', '🍇', '🍉', '💎', '🍆'];
 
   if (!username || !userId)
     return res.status(400).json({ error: 'Missing user info' });
