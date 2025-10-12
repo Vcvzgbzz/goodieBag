@@ -125,7 +125,7 @@ const tableCache = new Set();
 
 
 const sellAllByRarity = async (rarity, userId, channelId, conn) => {
-  
+
   const usersTable = `lootbox_users_${channelId}`;
   const rewardsTable = `lootbox_rewards_${channelId}`;
 
@@ -558,7 +558,7 @@ for (const rarity of rarityEndpoints) {
       conn.release();
     }
   });
-
+}
   
   
 module.exports = router;
