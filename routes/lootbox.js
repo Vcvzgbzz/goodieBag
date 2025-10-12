@@ -122,7 +122,7 @@ router.get('/lootbox', async (req, res) => {
   if (!username || !userId) {
     return res.status(400).json({ error: 'Missing user info' });
   }
-  if (!channelId && !Admins.includes(userId)) {
+  if (!channelId && !Admins.includes(username)) {
     return res.status(400).json({ error: 'Missing channel ID' });
   }
 
