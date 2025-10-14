@@ -29,12 +29,12 @@ const rarityBasePrice = {
 };
 
 const itemsByRarity = {
-  Common: ["Glorpshake", "GuangGuang Bible", "alienboogie", "glorpwork", "welcome", "xglorp", "gambaGlrop", "smorp"],
-  Uncommon: ["Glorpscheme", "glorpshiz", "glorppray", "glorppop", "glorpwiggle", "angryglorpshake", "glorpoopoo"],
-  Rare: ["soul sword", "glorp glasses", "glorp gun", "glorpstrong", "glorpsnail", "glorpcheer", "glorpstare", "glorpCute", 'glorpSpin'],
-  Epic: ["glorptwerk", "glorp griddy", "glorp rainbow", "glorp car", "glorp jiggy", "glorp group", "glorp ufo", 'glorpCozy','cokeGlrop'],
-  Legendary: ["glorp miku", "glorp doobie", "bewowow", "RAGEEEEE", "goldenGlorp", "glorpGang","glorpAss"],
-  Mythic: ["GLORIOUS GLROP","GLEX"]
+  Common: [" glorpShake ", " slumpe7PraiseGuangGuang ", " AlienDance ", " glorpHop ", " welcome ", " guuh ", " gambaGlorp ", " morp "],
+  Uncommon: [" glorp4evil ", " GLORPSHIT ", " GlorpPriest ", " glorpPrayge ", " glorpWiggle ", " hyperCokeShakey ", " glorpoopoo "],
+  Rare: [" slumpe7Sswang ", " glorprave ", " GlorpGun ", " slorpCALYPSO ", " snail ", " glorpCheer ", " glermStare ", " glorpCute ", ' glorpSpin '],
+  Epic: [" glorptwerk ", " glorpa ", " glorpRainbow ", " glorpkarting ", " glorp jiggy ", " glorpGang ", " glorpArrive ", ' glorpCozy ',' cokeglorp '],
+  Legendary: [" glorpmiku ", " zazaglorp ", " cockroachDance ", " RAGEEE ", " goldenGlorp ", " catJAM "," glorpBus "],
+  Mythic: [" GloriousGlorp "," GLEX "]
 };
 
 const conditions = [
