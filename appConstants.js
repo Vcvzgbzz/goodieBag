@@ -19,11 +19,11 @@ const rarities = [
 ];
 
 const rarityBoxRarities = {
-  Common: {
+  common: {
     price: 12,
     rarityArray: rarities,
   },
-  Uncommon: {
+  uncommon: {
     price: 25,
     rarityArray: [
       { rarity: "Common", weight: 35 },
@@ -34,7 +34,7 @@ const rarityBoxRarities = {
       { rarity: "Mythic", weight: 0.2 },
     ],
   },
-  Rare: {
+  rare: {
     price: 70,
     rarityArray: [
       { rarity: "Common", weight: 0 },
@@ -45,7 +45,7 @@ const rarityBoxRarities = {
       { rarity: "Mythic", weight: 0.2 },
     ],
   },
-  Epic: {
+  epic: {
     price: 150,
     rarityArray: [
       { rarity: "Common", weight: 0 },
@@ -56,7 +56,7 @@ const rarityBoxRarities = {
       { rarity: "Mythic", weight: 0.4 },
     ],
   },
-  Legendary: {
+  legendary: {
     price: 700,
     rarityArray: [
       { rarity: "Common", weight: 0 },

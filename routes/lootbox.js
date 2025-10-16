@@ -118,7 +118,7 @@ router.get("/lootbox", async (req, res) => {
 
   const now = Date.now();
   const lastCall = cooldowns[userId] || 0;
-  const cooldownTime = 360 * 1000; // 360 seconds
+  const cooldownTime = 360 * 1000;
 
   if (!username || !userId) {
     return res.status(400).json({ error: "Missing user info" });
