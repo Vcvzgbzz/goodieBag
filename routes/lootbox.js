@@ -201,10 +201,15 @@ router.get("/lootbox", async (req, res) => {
 router.get("/buylootbox", async (req, res) => {
   const { username, userId, channelId, rarityType, textMode } = req.query;
 
+  console.log("🟢 /buylootbox called with params:", req.query);
+
   if (!username || !userId || !rarityType) {
+    console.warn("⚠️ Missing required fields:", { username, userId, rarityType });
     return res.status(400).json({ error: "Missing required fields" });
   }
+
   if (!channelId && !Admins.includes(username)) {
+    console.warn("⚠️ Missing channel ID:", { username, channelId });
     return res.status(400).json({ error: "Missing channel ID" });
   }
 
@@ -212,67 +217,86 @@ router.get("/buylootbox", async (req, res) => {
   try {
     const usersTable = `lootbox_users_${channelId}`;
     const rewardsTable = `lootbox_rewards_${channelId}`;
+    console.log(`📦 Using tables: ${usersTable}, ${rewardsTable}`);
 
+    // Ensure tables exist
     if (!tableCache.has(channelId)) {
+      console.log(`🛠️ Creating tables for channel ${channelId}...`);
       await conn.query(userTableTemplate(usersTable));
       await conn.query(rewardsTableTemplate(rewardsTable));
       tableCache.add(channelId);
+      console.log(`✅ Tables ready for ${channelId}`);
     }
 
     const lootboxData = rarityBoxRarities[rarityType];
     if (!lootboxData) {
+      console.warn(`❌ Invalid lootbox rarity type: ${rarityType}`);
       return res.status(400).json({ error: "Invalid lootbox rarity type" });
     }
 
     const { price, rarityArray } = lootboxData;
+    console.log(`💰 Lootbox type "${rarityType}" selected. Price: ${price}`);
 
+    // Fetch user balance
+    console.log(`🔍 Checking user balance for ${username} (${userId})...`);
     const [userRows] = await conn.query(
       `SELECT balance FROM \`${usersTable}\` WHERE user_id = ?`,
-      [userId],
+      [userId]
     );
 
     let userBalance = 0;
     if (userRows.length === 0) {
+      console.log(`🆕 User not found, creating record for ${username} (${userId})`);
       await conn.query(
         `INSERT INTO \`${usersTable}\` (user_id, username, total_opened, balance)
          VALUES (?, ?, 0, 0)`,
-        [userId, username],
+        [userId, username]
       );
     } else {
       userBalance = userRows[0].balance;
+      console.log(`💵 Current balance for ${username}: ${userBalance}`);
     }
 
+    // Balance check
     if (userBalance < price) {
       const msg = `💸 You need ${price} coins to buy a ${rarityType} lootbox, but only have ${userBalance}.`;
+      console.warn(`❌ Insufficient balance: ${userBalance} < ${price}`);
       return textMode === "true"
         ? res.send(msg)
         : res.status(400).json({ error: msg });
     }
 
+    console.log(`✅ Deducting ${price} from ${username}'s balance...`);
     await conn.beginTransaction();
     await conn.query(
-      `UPDATE \`${usersTable}\` SET balance = balance - ?, total_opened = total_opened + 1 WHERE user_id = ?`,
-      [price, userId],
+      `UPDATE \`${usersTable}\` 
+       SET balance = balance - ?, total_opened = total_opened + 1 
+       WHERE user_id = ?`,
+      [price, userId]
     );
 
+    // Pick reward
+    console.log(`🎲 Rolling reward for ${rarityType} box...`);
     const reward = pickRandomItem(rarityArray);
-    console.log(`Receiving call to open a ${rarityType} lootbox: `, {
-      ...req.query,
-      channelId: channelId,
-      reward: reward,
-    });
+    console.log("🎁 Reward rolled:", reward);
 
+    // Store reward
+    console.log("🗃️ Inserting reward into DB...");
     await conn.query(
-      `INSERT INTO \`${rewardsTable}\` (user_id, reward_name, reward_rarity, reward_condition, reward_value)
+      `INSERT INTO \`${rewardsTable}\` 
+        (user_id, reward_name, reward_rarity, reward_condition, reward_value)
        VALUES (?, ?, ?, ?, ?)`,
-      [userId, reward.name, reward.rarity, reward.condition, reward.value],
+      [userId, reward.name, reward.rarity, reward.condition, reward.value]
     );
 
     await conn.commit();
+    console.log("✅ Transaction committed successfully.");
 
     const rarityEmoji = itemEmojiByRarity?.[reward.rarity] ?? "⚫";
     const conditionEmoji = conditionEmojis[reward.condition] || "❔";
     const message = `${rarityEmoji} 🎁 ${username} bought a ${rarityType} lootbox and received a ${reward.rarity.toUpperCase()} item: "${reward.name}" ${conditionEmoji} worth 💰${reward.value}! ${rarityEmoji}`;
+
+    console.log("📤 Sending response:", message);
 
     if (textMode === "true") {
       res.send(message);
@@ -280,13 +304,20 @@ router.get("/buylootbox", async (req, res) => {
       res.json({ reward, message });
     }
   } catch (err) {
-    await conn.rollback();
-    console.error("❌ Database error:", err);
+    console.error("❌ Error in /buylootbox:", err);
+    try {
+      await conn.rollback();
+      console.error("↩️ Transaction rolled back.");
+    } catch (rollbackErr) {
+      console.error("⚠️ Rollback failed:", rollbackErr);
+    }
     res.status(500).json({ error: "Something went wrong" });
   } finally {
     conn.release();
+    console.log("🔚 Connection released.");
   }
 });
+
 
 // === INVENTORY ROUTE ===
 router.get("/inventory", async (req, res) => {
