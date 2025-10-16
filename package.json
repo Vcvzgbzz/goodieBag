@@ -1,9 +1,10 @@
 {
   "name": "lootbox-backend",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "format": "prettier --write ."
   },
   "dependencies": {
     "dotenv": "^16.6.1",
@@ -13,5 +14,8 @@
   "keywords": [],
   "author": "jadeyn",
   "license": "ISC",
-  "description": ""
+  "description": "",
+  "devDependencies": {
+    "prettier": "^3.6.2"
+  }
 }
