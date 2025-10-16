@@ -182,6 +182,7 @@ module.exports = {
   Admins,
   itemEmojiByRarity,
   rarities,
+  rarityBoxRarities,
   rarityBasePrice,
   itemsByRarity,
   conditions,
