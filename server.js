@@ -3,11 +3,15 @@ const express = require("express");
 const app = express();
 const lootboxRoutes = require("./routes/lootbox");
 const slotRoutes = require("./routes/slots");
+const inventoryManagementRoutes = require("./routes/inventoryManagement");
+const balanceRoutes = require("./routes/balance");
 const { version } = require("./package.json");
 
 app.use(express.json());
 app.use("/api", lootboxRoutes);
 app.use("/api", slotRoutes);
+app.use("/api", inventoryManagementRoutes);
+app.use("/api", balanceRoutes);
 
 const PORT = process.env.PORT || 3000;
 
