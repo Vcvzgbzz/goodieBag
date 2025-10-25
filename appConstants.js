@@ -10,10 +10,10 @@ const itemEmojiByRarity = {
 };
 
 const rarities = [
-  { rarity: "Common", weight: 55 },
-  { rarity: "Uncommon", weight: 35 },
-  { rarity: "Rare", weight: 20 },
-  { rarity: "Epic", weight: 10 },
+  { rarity: "Common", weight: 35 },
+  { rarity: "Uncommon", weight: 40 },
+  { rarity: "Rare", weight: 25 },
+  { rarity: "Epic", weight: 15 },
   { rarity: "Legendary", weight: 1.25 },
   { rarity: "Mythic", weight: 0.2 },
 ];
@@ -57,13 +57,13 @@ const rarityBoxRarities = {
     ],
   },
   legendary: {
-    price: 700,
+    price: 550,
     rarityArray: [
       { rarity: "Common", weight: 0 },
       { rarity: "Uncommon", weight: 0 },
       { rarity: "Rare", weight: 0 },
-      { rarity: "Epic", weight: 30 },
-      { rarity: "Legendary", weight: 60 },
+      { rarity: "Epic", weight: 20 },
+      { rarity: "Legendary", weight: 70 },
       { rarity: "Mythic", weight: 10 },
     ],
   },
@@ -133,11 +133,11 @@ const itemsByRarity = {
 };
 
 const conditions = [
-  { condition: "Battle-Scarred", weight: 25, multiplier: 0.6 },
-  { condition: "Well-Worn", weight: 25, multiplier: 0.8 },
+  { condition: "Battle-Scarred", weight: 20, multiplier: 0.6 },
+  { condition: "Well-Worn", weight: 20, multiplier: 0.8 },
   { condition: "Field-Tested", weight: 30, multiplier: 1.0 },
-  { condition: "Minimal Wear", weight: 15, multiplier: 1.25 },
-  { condition: "Factory-New", weight: 5, multiplier: 1.5 },
+  { condition: "Minimal Wear", weight: 20, multiplier: 1.25 },
+  { condition: "Factory-New", weight: 10, multiplier: 1.5 },
 ];
 
 const conditionEmojis = {
