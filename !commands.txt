@@ -1,0 +1,9 @@
+!lootobox
+!sellall
+    !sellcommon
+    !selluncommon
+    !sellrare
+    !sellepic
+    !selllegendary
+    !sellmythic
+!slots <number>
