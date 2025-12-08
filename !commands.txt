@@ -1,0 +1,10 @@
+!lootbox
+!sellall
+    !sell common
+    !sell uncommon
+    !sell rare
+    !sell epic
+    !sell legendary
+    !sell mythic
+!slots <number>
+!glorpbox <message>
