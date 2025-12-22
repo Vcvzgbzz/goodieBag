@@ -1,3 +1,44 @@
+require('dotenv').config();
+
+function parseEnvJson(varName, defaultValue) {
+  const raw = process.env[varName];
+  if (!raw) return defaultValue;
+  try {
+    return JSON.parse(raw);
+  } catch (e) {
+    console.warn(`Invalid JSON for ${varName}, using default.`);
+    return defaultValue;
+  }
+}
+
+function parseEnvList(varName, defaultValue) {
+  const raw = process.env[varName];
+  if (!raw) return defaultValue;
+  // Try JSON array first
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed;
+  } catch (e) {
+    // ignore and try CSV
+  }
+  // Fallback: comma-separated list
+  return raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}
+
+function parseEnvNumber(varName, defaultValue) {
+  const raw = process.env[varName];
+  if (!raw) return defaultValue;
+  const num = Number(raw);
+  if (Number.isNaN(num)) {
+    console.warn(`Invalid number for ${varName}, using default.`);
+    return defaultValue;
+  }
+  return num;
+}
+
 const Admins = ["vechkabaz", "treggattv"];
 
 const itemEmojiByRarity = {
@@ -9,7 +50,7 @@ const itemEmojiByRarity = {
   Mythic: "🔴",
 };
 
-const rarities = [
+const defaultRarities = [
   { rarity: "Common", weight: 35 },
   { rarity: "Uncommon", weight: 40 },
   { rarity: "Rare", weight: 25 },
@@ -18,10 +59,12 @@ const rarities = [
   { rarity: "Mythic", weight: 0.2 },
 ];
 
-const rarityBoxRarities = {
+const rarities = parseEnvJson('RARITIES', defaultRarities);
+
+const defaultRarityBoxRarities = {
   common: {
     price: 12,
-    rarityArray: rarities,
+    rarityArray: defaultRarities,
   },
   uncommon: {
     price: 25,
@@ -69,7 +112,9 @@ const rarityBoxRarities = {
   },
 };
 
-const rarityBasePrice = {
+const rarityBoxRarities = parseEnvJson('RARITY_BOX_RARITIES', defaultRarityBoxRarities);
+
+const defaultRarityBasePrice = {
   Common: 10,
   Uncommon: 20,
   Rare: 50,
@@ -78,7 +123,18 @@ const rarityBasePrice = {
   Mythic: 2500,
 };
 
-const itemsByRarity = {
+const rarityBasePrice = process.env.RARITY_BASE_PRICE
+  ? parseEnvJson('RARITY_BASE_PRICE', defaultRarityBasePrice)
+  : {
+      Common: parseEnvNumber('COMMON_BASE_PRICE', defaultRarityBasePrice.Common),
+      Uncommon: parseEnvNumber('UNCOMMON_BASE_PRICE', defaultRarityBasePrice.Uncommon),
+      Rare: parseEnvNumber('RARE_BASE_PRICE', defaultRarityBasePrice.Rare),
+      Epic: parseEnvNumber('EPIC_BASE_PRICE', defaultRarityBasePrice.Epic),
+      Legendary: parseEnvNumber('LEGENDARY_BASE_PRICE', defaultRarityBasePrice.Legendary),
+      Mythic: parseEnvNumber('MYTHIC_BASE_PRICE', defaultRarityBasePrice.Mythic),
+    };
+
+const defaultItemsByRarity = {
   Common: [
     " glorpShake ",
     " slumpe7PraiseGuangGuang ",
@@ -132,6 +188,20 @@ const itemsByRarity = {
   Mythic: [" GloriousGlorp ", " GLEX "],
 };
 
+let itemsByRarity;
+if (process.env.ITEMS_BY_RARITY) {
+  itemsByRarity = parseEnvJson('ITEMS_BY_RARITY', defaultItemsByRarity);
+} else {
+  itemsByRarity = {
+    Common: parseEnvList('COMMON_ITEMS', defaultItemsByRarity.Common),
+    Uncommon: parseEnvList('UNCOMMON_ITEMS', defaultItemsByRarity.Uncommon),
+    Rare: parseEnvList('RARE_ITEMS', defaultItemsByRarity.Rare),
+    Epic: parseEnvList('EPIC_ITEMS', defaultItemsByRarity.Epic),
+    Legendary: parseEnvList('LEGENDARY_ITEMS', defaultItemsByRarity.Legendary),
+    Mythic: parseEnvList('MYTHIC_ITEMS', defaultItemsByRarity.Mythic),
+  };
+}
+
 const conditions = [
   { condition: "Battle-Scarred", weight: 20, multiplier: 0.6 },
   { condition: "Well-Worn", weight: 20, multiplier: 0.8 },
@@ -148,14 +218,14 @@ const conditionEmojis = {
   "Factory-New": "💎",
 };
 
-const rarityEndpoints = [
+const rarityEndpoints = parseEnvJson('RARITY_ENDPOINTS', [
   "Common",
   "Uncommon",
   "Rare",
   "Epic",
   "Legendary",
   "Mythic",
-];
+]);
 
 const rewardsTableTemplate = (rewardsTableName) => {
   return `CREATE TABLE IF NOT EXISTS \`${rewardsTableName}\` (
