@@ -53,6 +53,21 @@ function pickRandomItem(customRarityArray = null) {
 const cooldowns = {};
 const tableCache = new Set();
 
+function formatCompactLootboxMessage({
+  username,
+  action,
+  boxLabel,
+  reward,
+}) {
+  const rarityEmoji = itemEmojiByRarity?.[reward.rarity] ?? "⚫";
+  const conditionEmoji = conditionEmojis[reward.condition] || "❔";
+  const value = reward.value ?? 0;
+  const compactCondition = String(reward.condition || "Unknown").trim();
+  const compactBoxLabel = boxLabel ? ` ${boxLabel}` : "";
+
+  return `${rarityEmoji} ${username} ${action}${compactBoxLabel} -> ${reward.rarity.toUpperCase()} \"${reward.name}\" ${conditionEmoji}${compactCondition} | 💰${value}`;
+}
+
 // === LOOTBOX ROUTE ===
 router.get("/lootbox", async (req, res) => {
   const { username, userId, textMode, channelId } = req.query;
@@ -118,12 +133,12 @@ router.get("/lootbox", async (req, res) => {
 
     await conn.commit();
 
-    const rarityEmoji = itemEmojiByRarity?.[reward.rarity] ?? "⚫";
-    const condition = reward.condition;
-    const conditionEmoji = conditionEmojis[condition] || "❔";
-    const value = reward.value ?? 0;
-
-    const message = `${rarityEmoji} 🎁 ${username} opened a lootbox and received a ${reward.rarity.toUpperCase()} item: "${reward.name}" ${conditionEmoji} (${condition}) worth 💰${value}! ${rarityEmoji}`;
+    const message = formatCompactLootboxMessage({
+      username,
+      action: "opened",
+      boxLabel: "lootbox",
+      reward,
+    });
 
     if (textMode === "true") {
       res.send(message);
@@ -239,9 +254,12 @@ router.get("/buylootbox", async (req, res) => {
     await conn.commit();
     console.log("✅ Transaction committed successfully.");
 
-    const rarityEmoji = itemEmojiByRarity?.[reward.rarity] ?? "⚫";
-    const conditionEmoji = conditionEmojis[reward.condition] || "❔";
-    const message = `${rarityEmoji} 🎁 ${username} bought a ${rarityType} lootbox and received a ${reward.rarity.toUpperCase()} item: "${reward.name}" ${conditionEmoji} worth 💰${reward.value}! ${rarityEmoji}`;
+    const message = formatCompactLootboxMessage({
+      username,
+      action: "bought",
+      boxLabel: `${rarityType} lootbox`,
+      reward,
+    });
 
     console.log("📤 Sending response:", message);
 
@@ -268,6 +286,25 @@ router.get("/buylootbox", async (req, res) => {
 // === INVENTORY ROUTE ===
 router.get("/inventory", async (req, res) => {
   const { username, userId, textMode, channelId } = req.query;
+
+  const cleanRewardName = (name) => {
+    if (typeof name !== "string") return "Unknown Item";
+    let cleaned = name.replace(/\s+/g, " ").trim();
+
+    // Strip common wrapper junk from legacy item names while preserving inner text.
+    cleaned = cleaned
+      .replace(/^[\s\[\]\(\)"']+/, "")
+      .replace(/[\s\[\]\(\)"']+$/, "")
+      .trim();
+
+    return cleaned || "Unknown Item";
+  };
+
+  const truncate = (text, maxLen) => {
+    if (!text || text.length <= maxLen) return text;
+    if (maxLen <= 3) return text.slice(0, maxLen);
+    return `${text.slice(0, maxLen - 3)}...`;
+  };
 
   console.log("Receiving call to check the inventory: ", {
     ...req.query,
@@ -307,7 +344,11 @@ router.get("/inventory", async (req, res) => {
     }
 
     const inventory = {};
+    const groupedInventory = new Map();
+    const rarityStats = {};
     let totalWealth = 0;
+    let totalStacks = 0;
+    let totalItems = 0;
 
     for (const {
       reward_name,
@@ -316,14 +357,47 @@ router.get("/inventory", async (req, res) => {
       count,
       total_value,
     } of rows) {
-      const numericValue = Number(total_value) || 0; // convert string → number safely
+      const normalizedName = cleanRewardName(reward_name);
+      const numericCount = Number(count) || 0;
+      const numericValue = Number(total_value) || 0;
+      const groupKey = `${reward_rarity}::${reward_condition}::${normalizedName.toLowerCase()}`;
 
-      if (!inventory[reward_rarity]) inventory[reward_rarity] = [];
-      inventory[reward_rarity].push(
-        `${reward_name} (${reward_condition}) x${count} — 💰${numericValue}`,
-      );
+      if (!groupedInventory.has(groupKey)) {
+        groupedInventory.set(groupKey, {
+          reward_name: normalizedName,
+          reward_rarity,
+          reward_condition,
+          count: 0,
+          total_value: 0,
+        });
+      }
+
+      const existing = groupedInventory.get(groupKey);
+      existing.count += numericCount;
+      existing.total_value += numericValue;
+
+      if (!rarityStats[reward_rarity]) {
+        rarityStats[reward_rarity] = { items: 0, stacks: 0, value: 0 };
+      }
+      rarityStats[reward_rarity].items += numericCount;
+      rarityStats[reward_rarity].value += numericValue;
+      totalItems += numericCount;
 
       totalWealth += numericValue;
+    }
+
+    const groupedRows = Array.from(groupedInventory.values()).sort((a, b) => {
+      if (b.total_value !== a.total_value) return b.total_value - a.total_value;
+      return a.reward_name.localeCompare(b.reward_name);
+    });
+
+    for (const row of groupedRows) {
+      if (!inventory[row.reward_rarity]) inventory[row.reward_rarity] = [];
+      inventory[row.reward_rarity].push(
+        `${row.reward_name} (${row.reward_condition}) x${row.count} — 💰${row.total_value}`,
+      );
+      totalStacks += 1;
+      rarityStats[row.reward_rarity].stacks += 1;
     }
 
     const rarityOrder = [
@@ -334,6 +408,16 @@ router.get("/inventory", async (req, res) => {
       "Uncommon",
       "Common",
     ];
+
+    const rarityShort = {
+      Mythic: "M",
+      Legendary: "L",
+      Epic: "E",
+      Rare: "R",
+      Uncommon: "U",
+      Common: "C",
+    };
+
     const display = rarityOrder
       .filter((r) => inventory[r])
       .map(
@@ -342,9 +426,34 @@ router.get("/inventory", async (req, res) => {
       )
       .join(" | ");
 
+    const raritySummary = rarityOrder
+      .filter((r) => rarityStats[r])
+      .map(
+        (r) =>
+          `${itemEmojiByRarity[r]}${rarityShort[r]}:${rarityStats[r].items}`,
+      )
+      .join(" ");
+
+    const topItems = groupedRows.slice(0, 3).map((item) => {
+      const shortName = truncate(item.reward_name, 16);
+      return `${shortName} x${item.count} 💰${item.total_value}`;
+    });
+
+    const summaryMessage = [
+      `🎒 ${username}'s Inventory Summary`,
+      `🏦 💰${totalWealth}`,
+      `🧾 ${totalItems} items (${totalStacks} stacks)`,
+      raritySummary ? `📊 ${raritySummary}` : null,
+      topItems.length ? `🔝 ${topItems.join(" | ")}` : null,
+    ]
+      .filter(Boolean)
+      .join(" • ");
+
+    const safeSummaryMessage = truncate(summaryMessage, 430);
+
     const message = `🎒 ${username}'s Inventory → ${display} | 🏦 Total Value: 💰${totalWealth}`;
 
-    if (textMode === "true") res.send(message);
+    if (textMode === "true") res.send(safeSummaryMessage);
     else res.json({ inventory, totalWealth, message });
   } catch (err) {
     console.error("❌ Error fetching inventory:", err);

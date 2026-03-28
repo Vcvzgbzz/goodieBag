@@ -248,6 +248,37 @@ const userTableTemplate = (userTableName) => {
       );`;
 };
 
+const commandEventsTableTemplate = (tableName = "glorp_command_events") => {
+  return `CREATE TABLE IF NOT EXISTS \`${tableName}\` (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+        channel_id VARCHAR(255),
+        user_id VARCHAR(255),
+        username VARCHAR(255),
+        command_name VARCHAR(64),
+        was_success TINYINT(1) DEFAULT 1,
+        metadata_json JSON NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );`;
+};
+
+const askMemoryTableTemplate = (tableName = "glorp_ask_memory") => {
+  return `CREATE TABLE IF NOT EXISTS \`${tableName}\` (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+        channel_id VARCHAR(255),
+        user_id VARCHAR(255),
+        username VARCHAR(255),
+        question_text TEXT,
+        reply_text TEXT,
+        delta_score INT DEFAULT 0,
+        feeling_after TINYINT DEFAULT 5,
+        emotion VARCHAR(64),
+        reason_text VARCHAR(255),
+        safety_blocked TINYINT(1) DEFAULT 0,
+        safety_reason VARCHAR(100),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );`;
+};
+
 module.exports = {
   Admins,
   itemEmojiByRarity,
@@ -260,4 +291,6 @@ module.exports = {
   rarityEndpoints,
   rewardsTableTemplate,
   userTableTemplate,
+  commandEventsTableTemplate,
+  askMemoryTableTemplate,
 };
